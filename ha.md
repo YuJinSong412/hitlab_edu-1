@@ -54,7 +54,7 @@
 
 -> 따라서 변수는 객체를 기리키고 객체는 어떤 타입의 데이터도 될 수 있습니다.
 
-https://imgur.com/a/dCrHoXl.jpg
+![이미지](https://imgur.com/gUlwzMd.jpg")
 
 **type()함수**
 자료형을 알고 싶으면 type()함수를 사용하면 됩니다.
@@ -72,6 +72,9 @@ https://imgur.com/a/dCrHoXl.jpg
 
 <a id="m2"></a> 
 ## 2. 연산자
+![이미지2](https://imgur.com/YDmUWAr.jpg")
+
+산술 연산자의 종류는
 
 예제의 경우
 
