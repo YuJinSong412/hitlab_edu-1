@@ -1,0 +1,164 @@
+# OpenCV 및 OCR모듈 설치 유무 확인
+
+import sys
+import cv2                  #파이썬으로 openCV를 이용하기 위해 import cv2
+import pytesseract
+from PIL import Image
+
+# tesseract경로 추가해주기
+tesseract_path = 'C:\Users\LG\Tesseract-OCR'
+pytesseract.pytesseract.tesseract_cmd = tesseract_path + '/tesseract'
+
+#설치확인
+print "python:", sys.version
+print "opencv:", cv2.__version__
+print "pytesseract:", pytesseract.image_to_string(Image.open('images/test.png'))
+
+
+
+
+
+
+import numpy as np
+import cv2
+from PIL import Image
+import pytesseract
+import os
+import sys
+import json
+import requests
+
+def order_points(pts):
+    
+    rect = np.zeros((4, 2), dtype = "float32")
+
+   
+    s = pts.sum(axis = 1)
+    rect[0] = pts[np.argmin(s)]
+    rect[2] = pts[np.argmax(s)]
+
+    
+    diff = np.diff(pts, axis = 1)
+    rect[1] = pts[np.argmin(diff)]
+    rect[3] = pts[np.argmax(diff)]
+
+    
+    return rect
+
+def auto_scan_image():
+    
+    image = cv2.imread('images/yujin2.jpg')   
+    orig = image.copy()
+    r = 800.0 / image.shape[0]
+    dim = (int(image.shape[1] * r), 800)
+    image = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)  #->이미지 불러서 사이즈 변환시킴
+
+    
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) #흑백으로 처리함
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+    edged = cv2.Canny(gray, 75, 200)           #->블러셔 효과써서 엣지를 찾을 수 있게 함
+
+    
+
+    cv2.imshow("Image", image)
+    cv2.imshow("Edged", edged)
+    
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)                          #->2개의 이미지가 출력된다.
+
+    
+    
+    (cnts, _) = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE) #외곽을 찾음
+    cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:5]
+
+
+    for c in cnts:
+       
+        peri = cv2.arcLength(c, True)  #둘레의 길이를 계싼?
+        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+
+       
+        if len(approx) == 4:
+            screenCnt = approx
+            break
+
+   
+
+    cv2.drawContours(image, [screenCnt], -1, (0, 255, 0), 2)
+    cv2.imshow("Outline", image)
+    
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)                           #->외곽찾은걸로 출력됨
+
+    
+    
+    rect = order_points(screenCnt.reshape(4, 2) / r)
+    (topLeft, topRight, bottomRight, bottomLeft) = rect
+    
+    w1 = abs(bottomRight[0] - bottomLeft[0])
+    w2 = abs(topRight[0] - topLeft[0])
+    h1 = abs(topRight[1] - bottomRight[1])
+    h2 = abs(topLeft[1] - bottomLeft[1])
+    maxWidth = max([w1, w2])
+    maxHeight = max([h1, h2])
+    
+    dst = np.float32([[0,0], [maxWidth-1,0], 
+                      [maxWidth-1,maxHeight-1], [0,maxHeight-1]])
+    
+    M = cv2.getPerspectiveTransform(rect, dst)
+    warped = cv2.warpPerspective(orig, M, (maxWidth, maxHeight))
+
+   
+    
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)              #->반듯하게 변환하기
+    
+    
+    
+    warped = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY) #흑백으로 다시 바꾸기
+    warped = cv2.adaptiveThreshold(warped, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 21, 10) 
+
+
+    
+   
+    cv2.imshow("Scanned", warped)
+    cv2.imwrite('scannedImage.png', warped)
+     
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)                  #->스캔한 효과를 줘서 조명의 영향 제거함
+    
+def ocr_tesseract():
+    image_file = 'scannedImage.png'
+    im = Image.open(image_file)
+    text = pytesseract.image_to_string(im)       #이미지로부터 텍스트를 추출해 낼 수 있다.
+    im.show()
+
+   
+    
+    client_id = "bc_d3LocGEma2dQ6fUSZ"
+    client_secret = "1l_jx7f4wH"
+    encText = text
+    url = "https://openapi.naver.com/v1/papago/n2mt"
+
+    headers = {"X-Naver-Client-Id" :client_id,
+                "X-Naver-Client-Secret":client_secret}
+
+    params = (("source", "en"),
+                ("target", "ko"),
+                ("text", encText))
+
+    response = requests.post(url, data=params, headers=headers)
+    if response.status_code == 200:
+        response_body = response.json()
+        print(response_body[u'message'][u'result'][u'translatedText'])
+
+    
+if __name__ == '__main__':
+    auto_scan_image()
+    
+if __name__ == '__main__':
+    ocr_tesseract()
